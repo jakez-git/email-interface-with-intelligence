@@ -1,24 +1,62 @@
-import React from 'react';
-import type { Folder } from '../types';
+import React, { useMemo } from 'react';
+import { useEmails } from '../hooks/useEmails';
+import { useUI } from '../hooks/useUI';
+import { useSettings } from '../hooks/useSettings';
 import { TagIcon, PencilSquareIcon } from './icons';
 
-type ActiveFilter = { type: 'folder' | 'label', name: string };
-interface SidebarProps {
-  folders: Folder[];
-  labels: { name: string, count: number }[];
-  activeFilter: ActiveFilter;
-  onFilterChange: (filter: ActiveFilter) => void;
-  unreadFolderCounts: Record<string, number>;
-  unreadLabelCounts: Record<string, number>;
-  onCompose: () => void;
-}
+const Sidebar: React.FC = () => {
+  const { emails } = useEmails();
+  const { folders } = useSettings();
+  const { activeFilter, setActiveFilter, setSelectedEmailIds, setComposerState } = useUI();
 
-const Sidebar: React.FC<SidebarProps> = ({ folders, labels, activeFilter, onFilterChange, unreadFolderCounts, unreadLabelCounts, onCompose }) => {
+  const uniqueLabels = useMemo(() => {
+    const labelCounts: Record<string, number> = {};
+    emails.forEach(email => {
+        const seenLabels = new Set<string>();
+        email.labels.forEach(label => {
+            if (!seenLabels.has(label.name)) {
+                labelCounts[label.name] = (labelCounts[label.name] || 0) + 1;
+                seenLabels.add(label.name);
+            }
+        });
+    });
+    return Object.entries(labelCounts)
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+  }, [emails]);
+
+  const unreadFolderCounts = useMemo(() => {
+    return folders.reduce((acc, folder) => {
+        acc[folder.name] = emails.filter(e => e.folder === folder.name && !e.read).length;
+        return acc;
+    }, {} as Record<string, number>);
+  }, [emails, folders]);
+  
+  const unreadLabelCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    const unreadEmails = emails.filter(e => !e.read);
+    unreadEmails.forEach(email => {
+      const seenLabels = new Set<string>();
+      email.labels.forEach(label => {
+        if (!seenLabels.has(label.name)) {
+          counts[label.name] = (counts[label.name] || 0) + 1;
+          seenLabels.add(label.name);
+        }
+      });
+    });
+    return counts;
+  }, [emails]);
+
+  const handleFilterChange = (filter: { type: 'folder' | 'label', name: string }) => {
+    setActiveFilter(filter);
+    setSelectedEmailIds([]);
+  };
+
   return (
     <div className="h-full bg-gray-50 dark:bg-gray-800/50 p-2 flex flex-col overflow-y-auto">
       <div className="p-2">
         <button 
-          onClick={onCompose}
+          onClick={() => setComposerState({ isOpen: true, mode: 'new' })}
           className="w-full flex items-center justify-center p-2.5 rounded-md bg-blue-500 text-white font-semibold hover:bg-blue-600 transition-colors duration-150 shadow-sm"
         >
           <PencilSquareIcon className="w-5 h-5 mr-2" />
@@ -33,7 +71,7 @@ const Sidebar: React.FC<SidebarProps> = ({ folders, labels, activeFilter, onFilt
             return (
               <li key={folder.id}>
                 <button
-                  onClick={() => onFilterChange({ type: 'folder', name: folder.name })}
+                  onClick={() => handleFilterChange({ type: 'folder', name: folder.name })}
                   className={`w-full flex items-center justify-between p-2 my-1 rounded-md text-left text-sm font-medium transition-colors duration-150 ${
                     isSelected
                       ? 'bg-blue-500 text-white'
@@ -67,13 +105,13 @@ const Sidebar: React.FC<SidebarProps> = ({ folders, labels, activeFilter, onFilt
         </h3>
         <nav className="mt-2">
             <ul>
-                {labels.map(label => {
+                {uniqueLabels.map(label => {
                     const isSelected = activeFilter.type === 'label' && activeFilter.name === label.name;
                     const unreadCount = unreadLabelCounts[label.name] || 0;
                     return (
                         <li key={label.name}>
                              <button
-                                onClick={() => onFilterChange({ type: 'label', name: label.name })}
+                                onClick={() => handleFilterChange({ type: 'label', name: label.name })}
                                 className={`w-full flex items-center justify-between p-2 my-1 rounded-md text-left text-sm font-medium transition-colors duration-150 ${
                                     isSelected
                                     ? 'bg-blue-500 text-white'

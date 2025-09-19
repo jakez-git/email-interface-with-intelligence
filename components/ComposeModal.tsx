@@ -1,16 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Email } from '../types';
+import { useUI } from '../hooks/useUI';
+import { useEmailActions } from '../hooks/useEmailActions';
 import { XMarkIcon, PaperAirplaneIcon } from './icons';
 
 interface ComposeModalProps {
   isOpen: boolean;
-  onClose: () => void;
-  onSend: (payload: { to: string; subject: string; body: string }, originalEmailId?: string) => void;
   mode: 'new' | 'reply' | 'forward';
   email?: Email;
 }
 
-const ComposeModal: React.FC<ComposeModalProps> = ({ isOpen, onClose, onSend, mode, email }) => {
+const ComposeModal: React.FC<ComposeModalProps> = ({ isOpen, mode, email }) => {
+  const { setComposerState } = useUI();
+  const { sendEmail } = useEmailActions();
   const [to, setTo] = useState('');
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
@@ -34,23 +36,24 @@ const ComposeModal: React.FC<ComposeModalProps> = ({ isOpen, onClose, onSend, mo
       }
       setBody(initialBody);
 
-      // For reply and forward, auto-focus the textarea and place the cursor at the top.
       if (mode === 'reply' || mode === 'forward') {
         setTimeout(() => {
           if (bodyTextareaRef.current) {
             bodyTextareaRef.current.focus();
             bodyTextareaRef.current.setSelectionRange(0, 0);
           }
-        }, 100); // A small delay ensures the element is ready.
+        }, 100);
       }
     }
   }, [isOpen, mode, email]);
+
+  const onClose = () => setComposerState({ isOpen: false, mode: 'new' });
 
   if (!isOpen) return null;
 
   const handleSend = () => {
     if (to.trim() && subject.trim()) {
-      onSend({ to, subject, body }, (mode === 'reply' || mode === 'forward') ? email?.id : undefined);
+      sendEmail({ to, subject, body }, (mode === 'reply' || mode === 'forward') ? email?.id : undefined);
     } else {
       alert("Please fill in the 'To' and 'Subject' fields.");
     }

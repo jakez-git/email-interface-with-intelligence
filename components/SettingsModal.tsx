@@ -1,23 +1,12 @@
 import React, { useState } from 'react';
 import type { Rule, TrainingData, EmailAccount, Contact, Folder, RuleAction, SpamSettings, EmailFolderName } from '../types';
+import { useSettings } from '../hooks/useSettings';
+import { useEmails } from '../hooks/useEmails';
 import { XMarkIcon, SettingsIcon, ScaleIcon, BookOpenIcon, TrashIcon, UserCircleIcon, PlusIcon, UserGroupIcon, ShieldExclamationIcon } from './icons';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  rules: Rule[];
-  onAddRule: (rule: Omit<Rule, 'id'>) => void;
-  onDeleteRule: (ruleId: string) => void;
-  trainingData: TrainingData[];
-  accounts: EmailAccount[];
-  onAddAccount: (account: Omit<EmailAccount, 'id'>) => void;
-  onDeleteAccount: (accountId: string) => void;
-  contacts: Contact[];
-  onAddContact: (contact: Omit<Contact, 'id'>) => void;
-  onDeleteContact: (contactId: string) => void;
-  folders: Folder[];
-  spamSettings: SpamSettings;
-  onSpamSettingsChange: (settings: SpamSettings) => void;
 }
 
 const RulesManager: React.FC<{rules: Rule[], onAddRule: (rule: Omit<Rule, 'id'>) => void, onDeleteRule: (id: string) => void, folders: Folder[]}> = ({ rules, onAddRule, onDeleteRule, folders }) => {
@@ -179,14 +168,17 @@ const AccountManager: React.FC<{accounts: EmailAccount[], onAddAccount: (acc: Om
 };
 
 const ContactManager: React.FC<{ contacts: Contact[]; onAddContact: (contact: Omit<Contact, 'id'>) => void; onDeleteContact: (id: string) => void; }> = ({ contacts, onAddContact, onDeleteContact }) => {
-    const [newContact, setNewContact] = useState({ name: '', email: '' });
+    const [newContact, setNewContact] = useState({ name: '', emails: '' });
     const [isAdding, setIsAdding] = useState(false);
 
     const handleAdd = () => {
-        if (newContact.name.trim() && newContact.email.trim()) {
-            onAddContact(newContact);
-            setNewContact({ name: '', email: '' });
-            setIsAdding(false);
+        if (newContact.name.trim() && newContact.emails.trim()) {
+            const emails = newContact.emails.split(',').map(e => e.trim()).filter(e => e);
+            if(emails.length > 0) {
+                onAddContact({ name: newContact.name, emails });
+                setNewContact({ name: '', emails: '' });
+                setIsAdding(false);
+            }
         }
     };
 
@@ -199,7 +191,7 @@ const ContactManager: React.FC<{ contacts: Contact[]; onAddContact: (contact: Om
                             <UserCircleIcon className="w-6 h-6 mr-3 text-gray-400" />
                             <div>
                                 <p className="font-semibold text-gray-800 dark:text-gray-200">{contact.name}</p>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">{contact.email}</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">{contact.emails.join(', ')}</p>
                             </div>
                         </div>
                         <button onClick={() => onDeleteContact(contact.id)} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600">
@@ -212,7 +204,7 @@ const ContactManager: React.FC<{ contacts: Contact[]; onAddContact: (contact: Om
                 <div className="p-4 border rounded-md dark:border-gray-600 space-y-3">
                     <h4 className="font-semibold text-gray-800 dark:text-gray-200">Add New Contact</h4>
                     <input type="text" placeholder="Contact Name" value={newContact.name} onChange={e => setNewContact(p => ({...p, name: e.target.value}))} className="w-full p-2 border rounded bg-gray-50 dark:bg-gray-700 dark:border-gray-600" />
-                    <input type="email" placeholder="Email Address" value={newContact.email} onChange={e => setNewContact(p => ({...p, email: e.target.value}))} className="w-full p-2 border rounded bg-gray-50 dark:bg-gray-700 dark:border-gray-600" />
+                    <input type="text" placeholder="Email Addresses (comma-separated)" value={newContact.emails} onChange={e => setNewContact(p => ({...p, emails: e.target.value}))} className="w-full p-2 border rounded bg-gray-50 dark:bg-gray-700 dark:border-gray-600" />
                     <div className="flex space-x-2">
                         <button onClick={handleAdd} className="w-full px-3 py-1.5 text-sm bg-blue-500 text-white rounded-md hover:bg-blue-600">Save Contact</button>
                         <button onClick={() => setIsAdding(false)} className="w-full px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-600 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500">Cancel</button>
@@ -270,11 +262,25 @@ const JunkMailManager: React.FC<{ settings: SpamSettings; onChange: (settings: S
 };
 
 
-const SettingsModal: React.FC<SettingsModalProps> = (props) => {
-  const { isOpen, onClose, rules, onAddRule, onDeleteRule, trainingData, accounts, onAddAccount, onDeleteAccount, contacts, onAddContact, onDeleteContact, folders, spamSettings, onSpamSettingsChange } = props;
+const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
+  const { 
+    rules, setRules, 
+    accounts, setAccounts,
+    contacts, setContacts,
+    folders,
+    spamSettings, setSpamSettings,
+  } = useSettings();
+  const { trainingData } = useEmails();
   const [activeTab, setActiveTab] = useState<'accounts' | 'rules' | 'data' | 'contacts' | 'junk'>('accounts');
 
   if (!isOpen) return null;
+  
+  const handleAddRule = (rule: Omit<Rule, 'id'>) => setRules(prev => [...prev, { ...rule, id: `rule-${Date.now()}` }]);
+  const handleDeleteRule = (id: string) => setRules(prev => prev.filter(r => r.id !== id));
+  const handleAddAccount = (acc: Omit<EmailAccount, 'id'>) => setAccounts(prev => [...prev, { ...acc, id: `acc-${Date.now()}` }]);
+  const handleDeleteAccount = (id: string) => setAccounts(prev => prev.filter(a => a.id !== id));
+  const handleAddContact = (contact: Omit<Contact, 'id'>) => setContacts(prev => [...prev, { ...contact, id: `contact-${Date.now()}` }]);
+  const handleDeleteContact = (id: string) => setContacts(prev => prev.filter(c => c.id !== id));
 
   const tabs = [
       { id: 'accounts' as const, name: 'Accounts', icon: UserCircleIcon },
@@ -314,11 +320,11 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
         </div>
         
         <div className="overflow-y-auto flex-grow pr-2 -mr-2">
-            {activeTab === 'rules' && <RulesManager rules={rules} onAddRule={onAddRule} onDeleteRule={onDeleteRule} folders={folders} />}
+            {activeTab === 'rules' && <RulesManager rules={rules} onAddRule={handleAddRule} onDeleteRule={handleDeleteRule} folders={folders} />}
             {activeTab === 'data' && <TrainingDataViewer data={trainingData} />}
-            {activeTab === 'accounts' && <AccountManager accounts={accounts} onAddAccount={onAddAccount} onDeleteAccount={onDeleteAccount} />}
-            {activeTab === 'contacts' && <ContactManager contacts={contacts} onAddContact={onAddContact} onDeleteContact={onDeleteContact} />}
-            {activeTab === 'junk' && <JunkMailManager settings={spamSettings} onChange={onSpamSettingsChange} />}
+            {activeTab === 'accounts' && <AccountManager accounts={accounts} onAddAccount={handleAddAccount} onDeleteAccount={handleDeleteAccount} />}
+            {activeTab === 'contacts' && <ContactManager contacts={contacts} onAddContact={handleAddContact} onDeleteContact={handleDeleteContact} />}
+            {activeTab === 'junk' && <JunkMailManager settings={spamSettings} onChange={setSpamSettings} />}
         </div>
 
 

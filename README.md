@@ -14,53 +14,60 @@ This is an intelligent email client that uses the Google Gemini API to automatic
 
 ## How to Run
 
-This application is designed to be run locally from the source files using a simple web server.
+This application is a frontend demo and runs directly in your browser. To start it locally, you will need to use a simple web server. We provide scripts to make this easy.
 
 ### Prerequisites
 
-*   **Python 3**: A local web server is started using Python's built-in `http.server` module. Most macOS and Linux systems have it pre-installed. You can download it from [python.org](https://www.python.org/downloads/).
-*   **Gemini API Key**: The application requires a Google Gemini API key to function.
+1.  **A Google Gemini API Key**: The app's AI features will not work without it.
+2.  **Python 3**: The start-up scripts use Python to create a simple web server. Most systems have it pre-installed. If not, download it from [python.org](https://www.python.org/downloads/).
 
-### 1. Set Environment Variable
+### Step 1: Set Your API Key
 
-You must set the `API_KEY` environment variable to your Google Gemini API key.
+The application reads your Gemini API key from an environment variable named `API_KEY`. You must set this variable in your terminal session *before* running the start script.
 
-**On macOS / Linux:**
-```bash
-export API_KEY="YOUR_GEMINI_API_KEY"
-```
-*(You may want to add this line to your `.bashrc`, `.zshrc`, or shell profile file to make it permanent.)*
+**For Windows (in Command Prompt):**
 
-**On Windows (Command Prompt):**
+This command sets the key for your **current command prompt session only**.
+
 ```cmd
 set API_KEY="YOUR_GEMINI_API_KEY"
 ```
+*(Replace `YOUR_GEMINI_API_KEY` with your actual key.)*
 
-**On Windows (PowerShell):**
-```powershell
-$env:API_KEY="YOUR_GEMINI_API_KEY"
+**Important:** You must run `start.bat` from the **same command prompt window** where you ran the `set` command. Double-clicking the file will not work unless you have set `API_KEY` as a permanent system-wide environment variable.
+
+**For macOS or Linux (in Terminal):**
+```bash
+export API_KEY="YOUR_GEMINI_API_KEY"
 ```
+*(Replace `YOUR_GEMINI_API_KEY` with your actual key.)*
 
-### 2. Run the Start Script
+### Step 2: Run the Correct Start Script
 
-After setting the API key, run the appropriate script for your operating system from the project's root directory.
+We have provided scripts for different operating systems. **Please use the one that matches your system.**
+
+**On Windows:**
+From the same command prompt you used in Step 1, run the script:
+```cmd
+.\\start.bat
+```
+The script will check your setup, start the server, and automatically open the application in your browser.
 
 **On macOS / Linux:**
+First, make the script executable (you only need to do this once):
 ```bash
-# Make the script executable (only needed once)
 chmod +x ./start.sh
-
-# Run the script
+```
+Then, run the script:
+```bash
 ./start.sh
 ```
 
-**On Windows:**
-```cmd
-# Double-click start.bat or run it from the command line
-.\start.bat
-```
+### Step 3: View the Application
+Once the script is running, it will print a message like `Serving HTTP on ... port 8000`. You can now open your web browser and go to:
 
-The script will start a local web server, and you can access the application by navigating to **`http://localhost:8000`** in your web browser.
+**http://localhost:8000**
+
 
 ## Project Structure
 

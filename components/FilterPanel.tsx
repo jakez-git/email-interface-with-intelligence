@@ -1,14 +1,10 @@
 import React from 'react';
-import type { FilterCondition, FilterLogic } from '../App';
+import type { FilterCondition } from '../contexts/UIContext';
+import { useUI } from '../hooks/useUI';
 import { XMarkIcon, PlusIcon, TrashIcon } from './icons';
 
 interface FilterPanelProps {
   isOpen: boolean;
-  onClose: () => void;
-  conditions: FilterCondition[];
-  logic: FilterLogic;
-  onConditionsChange: (conditions: FilterCondition[]) => void;
-  onLogicChange: (logic: FilterLogic) => void;
 }
 
 const fieldOptions: { value: FilterCondition['field']; label: string }[] = [
@@ -41,18 +37,21 @@ const operatorOptions: Record<FilterCondition['field'], { value: FilterCondition
 };
 
 
-const FilterPanel: React.FC<FilterPanelProps> = ({
-  isOpen,
-  onClose,
-  conditions,
-  logic,
-  onConditionsChange,
-  onLogicChange,
-}) => {
+const FilterPanel: React.FC<FilterPanelProps> = ({ isOpen }) => {
+  const { 
+    filterConditions, 
+    setFilterConditions, 
+    filterLogic, 
+    setFilterLogic, 
+    setIsFilterPanelOpen 
+  } = useUI();
+
   if (!isOpen) return null;
+  
+  const onClose = () => setIsFilterPanelOpen(false);
 
   const handleUpdateCondition = (index: number, field: keyof FilterCondition, value: any) => {
-    const newConditions = [...conditions];
+    const newConditions = [...filterConditions];
     const oldCondition = newConditions[index];
     newConditions[index] = { ...oldCondition, [field]: value };
 
@@ -61,12 +60,12 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
         newConditions[index].operator = operatorOptions[value as FilterCondition['field']][0].value;
     }
     
-    onConditionsChange(newConditions);
+    setFilterConditions(newConditions);
   };
 
   const handleAddCondition = () => {
-    onConditionsChange([
-      ...conditions,
+    setFilterConditions([
+      ...filterConditions,
       {
         id: `filter-${Date.now()}`,
         field: 'sender',
@@ -77,12 +76,12 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
   };
 
   const handleRemoveCondition = (index: number) => {
-    onConditionsChange(conditions.filter((_, i) => i !== index));
+    setFilterConditions(filterConditions.filter((_, i) => i !== index));
   };
   
   const handleClear = () => {
-      onConditionsChange([]);
-      onLogicChange('AND');
+      setFilterConditions([]);
+      setFilterLogic('AND');
   };
 
   return (
@@ -95,18 +94,16 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
       </div>
 
       <div className="space-y-4">
-        {/* Logic Toggle */}
         <div className="flex items-center space-x-2">
             <span className="text-sm font-medium">Match:</span>
             <div className="flex rounded-md bg-gray-100 dark:bg-gray-700 p-0.5">
-                <button onClick={() => onLogicChange('AND')} className={`px-3 py-1 text-sm rounded-md transition-all ${logic === 'AND' ? 'bg-white dark:bg-gray-900 shadow' : 'text-gray-600 dark:text-gray-300'}`}>All (AND)</button>
-                <button onClick={() => onLogicChange('OR')} className={`px-3 py-1 text-sm rounded-md transition-all ${logic === 'OR' ? 'bg-white dark:bg-gray-900 shadow' : 'text-gray-600 dark:text-gray-300'}`}>Any (OR)</button>
+                <button onClick={() => setFilterLogic('AND')} className={`px-3 py-1 text-sm rounded-md transition-all ${filterLogic === 'AND' ? 'bg-white dark:bg-gray-900 shadow' : 'text-gray-600 dark:text-gray-300'}`}>All (AND)</button>
+                <button onClick={() => setFilterLogic('OR')} className={`px-3 py-1 text-sm rounded-md transition-all ${filterLogic === 'OR' ? 'bg-white dark:bg-gray-900 shadow' : 'text-gray-600 dark:text-gray-300'}`}>Any (OR)</button>
             </div>
         </div>
 
-        {/* Conditions */}
         <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
-            {conditions.map((cond, index) => (
+            {filterConditions.map((cond, index) => (
                 <div key={cond.id} className="flex items-center space-x-2 p-2 bg-gray-50 dark:bg-gray-700/50 rounded-md">
                    <select value={cond.field} onChange={e => handleUpdateCondition(index, 'field', e.target.value)} className="p-1.5 border rounded-md text-sm bg-white dark:bg-gray-800 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500 w-1/3">
                        {fieldOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}

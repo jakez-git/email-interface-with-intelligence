@@ -104,7 +104,7 @@ export const MOCK_EMAILS: Email[] = [
   },
   {
     id: '5',
-    sender: 'Jane Doe',
+    sender: 'Jane Doe <jane.doe@example.com>',
     recipient: 'user@example.com',
     subject: 'Project Alpha Update & Next Steps',
     body: 'Hi team, great work on the Q3 projections. I\'ve attached the final report. Let\'s schedule a meeting for early next week to discuss our strategy for Q4. Please send me your availability. Thanks, Jane.',
@@ -127,10 +127,10 @@ export const MOCK_EMAILS: Email[] = [
 ];
 
 export const INITIAL_CONTACTS: Contact[] = [
-  { id: 'contact-1', name: 'Tech Weekly', email: 'newsletter@techweekly.com' },
-  { id: 'contact-2', name: 'Cloud Service Billing', email: 'billing@cloudservice.com' },
-  { id: 'contact-3', name: 'Support PM', email: 'support@projectmanager.app' },
-  { id: 'contact-4', name: 'E-Commerce Store', email: 'marketing@e-commercestore.com' },
-  { id: 'contact-5', name: 'Jane Doe', email: 'jane.doe@example.com' },
-  { id: 'contact-6', name: 'John Smith', email: 'john.smith@work.com' },
+  { id: 'contact-1', name: 'Tech Weekly', emails: ['newsletter@techweekly.com'] },
+  { id: 'contact-2', name: 'Cloud Service Billing', emails: ['billing@cloudservice.com'] },
+  { id: 'contact-3', name: 'Support PM', emails: ['support@projectmanager.app'] },
+  { id: 'contact-4', name: 'E-Commerce Store', emails: ['marketing@e-commercestore.com'] },
+  { id: 'contact-5', name: 'Jane Doe', emails: ['jane.doe@example.com', 'jane.d@personal.co'] },
+  { id: 'contact-6', name: 'John Smith', emails: ['john.smith@work.com'] },
 ];

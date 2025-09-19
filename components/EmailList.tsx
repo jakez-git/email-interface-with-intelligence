@@ -1,29 +1,18 @@
 import React, { useState } from 'react';
-import type { Email, Folder, EmailFolderName } from '../types';
+import type { Email, EmailFolderName } from '../types';
+import { useFilteredEmails } from '../hooks/useFilteredEmails';
+import { useUI } from '../hooks/useUI';
+import { useEmailActions } from '../hooks/useEmailActions';
+import { useSettings } from '../hooks/useSettings';
 import { FunnelIcon, ArrowUpIcon, ArrowDownIcon, TrashIcon, ArchiveBoxIcon, EnvelopeIcon, EnvelopeOpenIcon, FolderArrowDownIcon, ShieldExclamationIcon } from './icons';
 
-interface EmailListProps {
-  emails: Email[];
-  selectedEmailIds: string[];
-  onSelectEmails: (ids: string[]) => void;
-  sortConfig: { key: string; direction: 'asc' | 'desc' };
-  onSortChange: (key: string) => void;
-  onToggleFilter: () => void;
-  onSetReadStatus: (ids: string[], read: boolean) => void;
-  onArchive: (ids: string[]) => void;
-  onDelete: (ids: string[]) => void;
-  onJunk: (ids: string[]) => void;
-  onMove: (ids: string[], folder: EmailFolderName) => void;
-  folders: Folder[];
-  activeFilter: { type: 'folder' | 'label', name: string };
-  onEmptyTrash: () => void;
-}
-
-const EmailListItem: React.FC<{
+interface EmailListItemProps {
     email: Email, 
     isSelected: boolean, 
     onSelect: (id: string, isCheckbox: boolean, shiftKey: boolean) => void
-}> = ({ email, isSelected, onSelect }) => {
+}
+
+const EmailListItem: React.FC<EmailListItemProps> = ({ email, isSelected, onSelect }) => {
     const date = new Date(email.timestamp);
     const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const isToday = date.toDateString() === new Date().toDateString();
@@ -64,8 +53,11 @@ const EmailListItem: React.FC<{
     );
 };
 
-const EmailList: React.FC<EmailListProps> = (props) => {
-  const { emails, selectedEmailIds, onSelectEmails, sortConfig, onSortChange, onToggleFilter, onSetReadStatus, onArchive, onDelete, onJunk, onMove, folders, activeFilter, onEmptyTrash } = props;
+const EmailList: React.FC = () => {
+  const emails = useFilteredEmails();
+  const { selectedEmailIds, setSelectedEmailIds, sortConfig, setSortConfig, activeFilter, setIsFilterPanelOpen } = useUI();
+  const { setReadStatus, archiveEmails, deleteEmails, junkEmails, moveToFolder, emptyTrash } = useEmailActions();
+  const { folders } = useSettings();
   const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
 
   const handleSelect = (id: string, isCheckbox: boolean, shiftKey: boolean) => {
@@ -76,7 +68,7 @@ const EmailList: React.FC<EmailListProps> = (props) => {
         const end = Math.max(currentIndex, lastIndex);
         const rangeIds = emails.slice(start, end + 1).map(e => e.id);
         const newSelectedIds = new Set([...selectedEmailIds, ...rangeIds]);
-        onSelectEmails(Array.from(newSelectedIds));
+        setSelectedEmailIds(Array.from(newSelectedIds));
     } else if (isCheckbox) {
         const newSelected = new Set(selectedEmailIds);
         if (newSelected.has(id)) {
@@ -84,19 +76,26 @@ const EmailList: React.FC<EmailListProps> = (props) => {
         } else {
             newSelected.add(id);
         }
-        onSelectEmails(Array.from(newSelected));
+        setSelectedEmailIds(Array.from(newSelected));
     } else {
-        onSelectEmails([id]);
+        setSelectedEmailIds([id]);
     }
     setLastSelectedId(id);
   };
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
-        onSelectEmails(emails.map(email => email.id));
+        setSelectedEmailIds(emails.map(email => email.id));
     } else {
-        onSelectEmails([]);
+        setSelectedEmailIds([]);
     }
+  };
+  
+  const handleSortChange = (key: string) => {
+    setSortConfig(prev => ({ 
+        key: key as typeof prev.key, 
+        direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc' 
+    }));
   };
 
   const isAllSelected = emails.length > 0 && selectedEmailIds.length === emails.length;
@@ -113,13 +112,12 @@ const EmailList: React.FC<EmailListProps> = (props) => {
         <span className="ml-3 text-sm font-medium">{selectedEmailIds.length} selected</span>
       </div>
       <div className="flex items-center space-x-2">
-        <button onClick={() => onSetReadStatus(selectedEmailIds, true)} title="Mark as Read" className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><EnvelopeOpenIcon className="w-5 h-5"/></button>
-        <button onClick={() => onSetReadStatus(selectedEmailIds, false)} title="Mark as Unread" className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><EnvelopeIcon className="w-5 h-5"/></button>
-        <button onClick={() => onArchive(selectedEmailIds)} title="Archive" className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><ArchiveBoxIcon className="w-5 h-5"/></button>
-        <button onClick={() => onJunk(selectedEmailIds)} title="Mark as Junk" className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><ShieldExclamationIcon className="w-5 h-5"/></button>
-        <button onClick={() => onDelete(selectedEmailIds)} title="Delete" className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><TrashIcon className="w-5 h-5"/></button>
-        {/* Simple Move dropdown for now */}
-        <select onChange={(e) => onMove(selectedEmailIds, e.target.value as EmailFolderName)} className="text-xs p-1 rounded bg-gray-200 dark:bg-gray-700 border-none focus:ring-0">
+        <button onClick={() => setReadStatus(selectedEmailIds, true)} title="Mark as Read" className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><EnvelopeOpenIcon className="w-5 h-5"/></button>
+        <button onClick={() => setReadStatus(selectedEmailIds, false)} title="Mark as Unread" className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><EnvelopeIcon className="w-5 h-5"/></button>
+        <button onClick={() => archiveEmails(selectedEmailIds)} title="Archive" className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><ArchiveBoxIcon className="w-5 h-5"/></button>
+        <button onClick={() => junkEmails(selectedEmailIds)} title="Mark as Junk" className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><ShieldExclamationIcon className="w-5 h-5"/></button>
+        <button onClick={() => deleteEmails(selectedEmailIds)} title="Delete" className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><TrashIcon className="w-5 h-5"/></button>
+        <select onChange={(e) => moveToFolder(selectedEmailIds, e.target.value as EmailFolderName)} className="text-xs p-1 rounded bg-gray-200 dark:bg-gray-700 border-none focus:ring-0">
             <option>Move to...</option>
             {folders.map(f => <option key={f.id} value={f.name}>{f.name}</option>)}
         </select>
@@ -138,16 +136,16 @@ const EmailList: React.FC<EmailListProps> = (props) => {
         <div className="flex items-center space-x-2">
              <select 
                 value={sortConfig.key} 
-                onChange={e => onSortChange(e.target.value)}
+                onChange={e => handleSortChange(e.target.value)}
                 className="text-sm font-medium text-gray-700 dark:text-gray-200 bg-transparent dark:bg-gray-800 focus:outline-none focus:ring-0 border-none"
              >
                  {sortOptions.map(opt => <option key={opt.key} value={opt.key} className="dark:bg-gray-700 font-medium">{opt.label}</option>)}
              </select>
-            <button onClick={() => onSortChange(sortConfig.key)} className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
+            <button onClick={() => handleSortChange(sortConfig.key)} className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
                 {sortConfig.direction === 'asc' ? <ArrowUpIcon className="w-4 h-4" /> : <ArrowDownIcon className="w-4 h-4" />}
             </button>
         </div>
-        <button onClick={onToggleFilter} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
+        <button onClick={() => setIsFilterPanelOpen(p => !p)} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
             <FunnelIcon className="w-5 h-5 text-gray-600 dark:text-gray-300" />
         </button>
       </div>
@@ -157,7 +155,7 @@ const EmailList: React.FC<EmailListProps> = (props) => {
   const TrashToolbar = () => (
       <div className="p-2 flex-shrink-0">
           <button
-            onClick={onEmptyTrash}
+            onClick={emptyTrash}
             className="w-full text-sm text-red-600 dark:text-red-400 font-semibold p-2 rounded-md bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 flex items-center justify-center space-x-2">
             <TrashIcon className="w-4 h-4" />
             <span>Empty Trash Now</span>

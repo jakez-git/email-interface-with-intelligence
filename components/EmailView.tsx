@@ -1,5 +1,9 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import type { Email, Label, Folder, Contact, EmailFolderName } from '../types';
+import type { Email, Label, Contact, EmailFolderName } from '../types';
+import { useEmailActions } from '../hooks/useEmailActions';
+import { useSettings } from '../hooks/useSettings';
+import { useEmails } from '../hooks/useEmails';
+import { useUI } from '../hooks/useUI';
 import { TagIcon, SparklesIcon, UserIcon, ScaleIcon, XMarkIcon, PlusIcon, MinusCircleIcon, ArchiveBoxIcon, ArrowUturnLeftIcon, ArrowUturnRightIcon, TrashIcon, EnvelopeIcon, EnvelopeOpenIcon, FolderArrowDownIcon, ShieldExclamationIcon, UserPlusIcon } from './icons';
 
 const AILabelPill: React.FC<{ label: Label; onRemove?: () => void; }> = ({ label, onRemove }) => {
@@ -104,27 +108,25 @@ const AIAnalysisView: React.FC<{
 
 interface EmailViewProps {
   email: Email | null;
-  folders: Folder[];
-  onUpdateLabel: (emailId: string, labelId: string, newName: string) => void;
-  onConfirmAiLabel: (emailId: string, labelId: string) => void;
-  onRemoveLabel: (emailId: string, labelId: string) => void;
-  onRejectAiLabel: (emailId: string, label: Label) => void;
-  isAnalyzing: boolean;
-  onArchive: (emailId: string) => void;
-  onDelete: (emailId: string) => void;
-  onJunk: (emailId: string) => void;
-  onMove: (emailId: string, folder: EmailFolderName) => void;
-  onSetReadStatus: (emailId: string, read: boolean) => void;
-  onReply: (email: Email) => void;
-  onForward: (email: Email) => void;
-  contacts: Contact[];
-  onAddContact: (contact: Omit<Contact, 'id'>) => void;
 }
 
-const EmailView: React.FC<EmailViewProps> = (props) => {
-  const { email, folders, onUpdateLabel, onConfirmAiLabel, onRemoveLabel, onRejectAiLabel, isAnalyzing, onArchive, onDelete, onJunk, onMove, onSetReadStatus, onReply, onForward, contacts, onAddContact } = props;
+const EmailView: React.FC<EmailViewProps> = ({ email }) => {
+  const { isAnalyzing, analyzeEmail } = useEmails();
+  const { setComposerState } = useUI();
+  const { 
+    updateLabel, confirmAiLabel, removeLabel, rejectAiLabel,
+    archiveEmails, deleteEmails, junkEmails, moveToFolder, setReadStatus,
+  } = useEmailActions();
+  const { folders, contacts, setContacts } = useSettings();
+  
   const [isMoveMenuOpen, setIsMoveMenuOpen] = useState(false);
   const moveMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (email) {
+      analyzeEmail(email);
+    }
+  }, [email, analyzeEmail]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -138,34 +140,33 @@ const EmailView: React.FC<EmailViewProps> = (props) => {
 
   const senderInfo = useMemo(() => {
     if (!email) return null;
-
-    // Standardize email matching by converting to lowercase
     const senderEmailMatch = email.sender.toLowerCase();
-    const contact = contacts.find(c => 
-        c.email.toLowerCase() === senderEmailMatch || 
-        senderEmailMatch.includes(`<${c.email.toLowerCase()}>`)
-    );
+    let matchedEmail: string | undefined;
+    const contact = contacts.find(c => {
+        matchedEmail = c.emails.find(e => 
+            e.toLowerCase() === senderEmailMatch || 
+            senderEmailMatch.includes(`<${e.toLowerCase()}>`)
+        );
+        return !!matchedEmail;
+    });
 
-    if (contact) {
-        return { name: contact.name, email: contact.email, isContact: true };
+    if (contact && matchedEmail) {
+        return { name: contact.name, email: matchedEmail, isContact: true };
     }
-    
-    // Simple parser for "Name <email@example.com>" format
     const match = email.sender.match(/(.*)<(.*)>/);
     if (match && match[2]) {
         return { name: match[1].trim(), email: match[2].trim(), isContact: false };
     }
-    
-    // Treat as just an email if no other format matches
     return { name: email.sender, email: email.sender, isContact: false };
   }, [email, contacts]);
 
   const handleAddSenderToContacts = () => {
     if (!senderInfo || senderInfo.isContact) return;
     const name = senderInfo.name === senderInfo.email 
-        ? senderInfo.email.split('@')[0] // Use part before @ if name is just the email
+        ? senderInfo.email.split('@')[0]
         : senderInfo.name;
-    onAddContact({ name, email: senderInfo.email });
+    const newContact: Omit<Contact, 'id'> = { name, emails: [senderInfo.email]};
+    setContacts(prev => [...prev, { ...newContact, id: `contact-${Date.now()}` }]);
   };
 
   if (!email) {
@@ -180,7 +181,7 @@ const EmailView: React.FC<EmailViewProps> = (props) => {
     const newLabelName = prompt("Enter new label name:");
     if (newLabelName && newLabelName.trim() !== '') {
         const newId = `label-user-${Date.now()}`;
-        onUpdateLabel(email.id, newId, newLabelName);
+        updateLabel(email.id, newId, newLabelName);
     }
   };
   
@@ -199,16 +200,16 @@ const EmailView: React.FC<EmailViewProps> = (props) => {
         <div className="flex justify-between items-start">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-50">{email.subject}</h1>
             <div className="flex items-center space-x-1 flex-shrink-0 ml-4">
-                <ActionButton onClick={() => onReply(email)} icon={ArrowUturnLeftIcon} title="Reply"/>
-                <ActionButton onClick={() => onForward(email)} icon={ArrowUturnRightIcon} title="Forward"/>
+                <ActionButton onClick={() => setComposerState({ isOpen: true, mode: 'reply', emailToReply: email })} icon={ArrowUturnLeftIcon} title="Reply"/>
+                <ActionButton onClick={() => setComposerState({ isOpen: true, mode: 'forward', emailToReply: email })} icon={ArrowUturnRightIcon} title="Forward"/>
                 <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 mx-1"></div>
-                <ActionButton onClick={() => onArchive(email.id)} icon={ArchiveBoxIcon} title="Archive"/>
-                <ActionButton onClick={() => onJunk(email.id)} icon={ShieldExclamationIcon} title="Mark as Junk"/>
-                <ActionButton onClick={() => onDelete(email.id)} icon={TrashIcon} title="Delete"/>
+                <ActionButton onClick={() => archiveEmails([email.id])} icon={ArchiveBoxIcon} title="Archive"/>
+                <ActionButton onClick={() => junkEmails([email.id])} icon={ShieldExclamationIcon} title="Mark as Junk"/>
+                <ActionButton onClick={() => deleteEmails([email.id])} icon={TrashIcon} title="Delete"/>
                 {email.read ? (
-                    <ActionButton onClick={() => onSetReadStatus(email.id, false)} icon={EnvelopeIcon} title="Mark as Unread" />
+                    <ActionButton onClick={() => setReadStatus([email.id], false)} icon={EnvelopeIcon} title="Mark as Unread" />
                 ) : (
-                    <ActionButton onClick={() => onSetReadStatus(email.id, true)} icon={EnvelopeOpenIcon} title="Mark as Read" />
+                    <ActionButton onClick={() => setReadStatus([email.id], true)} icon={EnvelopeOpenIcon} title="Mark as Read" />
                 )}
                 <div className="relative" ref={moveMenuRef}>
                     <ActionButton onClick={() => setIsMoveMenuOpen(p => !p)} icon={FolderArrowDownIcon} title="Move to folder"/>
@@ -218,7 +219,7 @@ const EmailView: React.FC<EmailViewProps> = (props) => {
                                 {folders.map(folder => (
                                     <li key={folder.id}>
                                         <button 
-                                            onClick={() => { onMove(email.id, folder.name); setIsMoveMenuOpen(false); }}
+                                            onClick={() => { moveToFolder([email.id], folder.name); setIsMoveMenuOpen(false); }}
                                             className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-3"
                                         >
                                            <folder.icon className="w-4 h-4"/>
@@ -259,7 +260,7 @@ const EmailView: React.FC<EmailViewProps> = (props) => {
             {userAndRuleLabels.length === 0 && !isAnalyzing && (
                 <span className="text-xs text-gray-400">None</span>
             )}
-            {userAndRuleLabels.map((label) => <AILabelPill key={label.id} label={label} onRemove={() => onRemoveLabel(email.id, label.id)} />)}
+            {userAndRuleLabels.map((label) => <AILabelPill key={label.id} label={label} onRemove={() => removeLabel(email.id, label.id)} />)}
             <button 
                 onClick={handleAddNewLabel}
                 className="text-xs font-medium px-2.5 py-1 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-300"
@@ -276,7 +277,7 @@ const EmailView: React.FC<EmailViewProps> = (props) => {
         </div>
       )}
 
-      <AIAnalysisView labels={email.labels} onConfirmLabel={(labelId) => onConfirmAiLabel(email.id, labelId)} onRejectLabel={(label) => onRejectAiLabel(email.id, label)} />
+      <AIAnalysisView labels={email.labels} onConfirmLabel={(labelId) => confirmAiLabel(email.id, labelId)} onRejectLabel={(label) => rejectAiLabel(email.id, label)} />
       
       <main className="flex-grow pt-6 prose prose-sm dark:prose-invert max-w-none">
         <p>{email.body}</p>
