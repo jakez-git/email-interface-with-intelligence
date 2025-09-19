@@ -1,0 +1,5 @@
+{
+  "name": "AI Email Assistant",
+  "description": "An intelligent email client that uses AI to automatically categorize and label your emails. It simulates the functionality of a desktop email application like Outlook, providing a familiar interface for managing your inbox while leveraging the power of Gemini for smart organization.",
+  "requestFramePermissions": []
+}
